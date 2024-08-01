@@ -61,6 +61,7 @@ impl CPU {
                 },
                 0x9000..=0x9FFF => { self.sne(x, y); },
                 0xA000..=0xAFFF => { self.set_index(addr); },
+                0xB000..=0xBFFF => { self.jmp_plus_register(addr); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -195,6 +196,16 @@ impl CPU {
         self.registers[0xf] = previous_msb;
     }
 
+    // (Annn) set index register to addr nnn
+    fn set_index(&mut self, addr: u16) {
+        self.index_register = addr;
+    }
+
+    // (Bnnn) jmp pc to v0 + addr
+    fn jmp_plus_register(&mut self, addr: u16) {
+        self.pc = ((self.registers[0] as u16) + addr) as usize;
+    }
+
     // (0000) returns and decrements stack pointer
     fn ret(&mut self) {
         if self.stack_pointer == 0 {
@@ -204,11 +215,6 @@ impl CPU {
         self.stack_pointer -= 1;
         let call_addr = self.stack[self.stack_pointer];
         self.pc = call_addr as usize;
-    }
-
-    // (Annn) set index register to addr nnn
-    fn set_index(&mut self, addr: u16) {
-        self.index_register = addr;
     }
 }
 
