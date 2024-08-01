@@ -23,9 +23,8 @@ impl CPU {
             // let c = ((opcode & 0xF000) >> 12) as u8;
             let x = ((opcode & 0x0F00) >> 8) as u8;
             let y = ((opcode & 0x00F0) >> 4) as u8;
-            let d = ((opcode & 0x000F) >> 0) as u8;
+            // let d = ((opcode & 0x000F) >> 0) as u8;
 
-            let nnn = opcode & 0x0FFF;
             let kk = (opcode & 0x0FF) as u8;
             let op_minor = (opcode & 0x000F) as u8;
             let addr = opcode & 0x0FFF;
@@ -48,6 +47,7 @@ impl CPU {
                         2 => { self.and_xy(x, y) },
                         3 => { self.xor_xy(x, y) },
                         4 => { self.add_xy(x, y); },
+                        5 => { self.sub_xy(x, y); },
                         _ => { todo!("Opcode: {:04x}", opcode); },
                     }
                 },
@@ -87,6 +87,7 @@ impl CPU {
         if x != kk {
             self.pc += 2;
         }
+    }
     
     // (6xkk) loads kk into register x
     fn ld(&mut self, x: u8, kk: u8) {
@@ -96,7 +97,6 @@ impl CPU {
     // (7xkk) Adds kk to value stored in register x
     fn add(&mut self, x: u8, kk: u8) {
         self.registers[x as usize] += kk;
-    }
     }
 
     // (8xy1) bitwise x or y and store in x
@@ -135,6 +135,21 @@ impl CPU {
             self.registers[0xf] = 1;
         } else {
             self.registers[0xf] = 0;
+        }
+    }
+
+    // (8xy5) sub y from x and store in x and set VF to 0 if underflow
+    fn sub_xy(&mut self, x: u8, y: u8) {
+        let arg1 = self.registers[x as usize];
+        let arg2 = self.registers[y as usize];
+
+        let (val, overflow) = arg1.overflowing_sub(arg2);
+        self.registers[x as usize] = val;
+
+        if overflow {
+            self.registers[0xf] = 0;
+        } else {
+            self.registers[0xf] = 1;
         }
     }
 
