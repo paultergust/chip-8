@@ -46,14 +46,15 @@ impl CPU {
                 0x7000..=0x7FFF => { self.add(x, kk); },
                 0x8000..=0x8FFF => {
                     match op_minor {
-                        0 => { self.ld(x, self.get_register(y))},
-                        1 => { self.or_xy(x, y) },
-                        2 => { self.and_xy(x, y) },
-                        3 => { self.xor_xy(x, y) },
-                        4 => { self.add_xy(x, y); },
-                        5 => { self.sub_xy(x, y); },
-                        6 => { self.shift_right(x); },
-                        7 => { self.sub_y_from_x(x, y); },
+                        0x0 => { self.ld(x, self.get_register(y))},
+                        0x1 => { self.or_xy(x, y) },
+                        0x2 => { self.and_xy(x, y) },
+                        0x3 => { self.xor_xy(x, y) },
+                        0x4 => { self.add_xy(x, y); },
+                        0x5 => { self.sub_xy(x, y); },
+                        0x6 => { self.shift_right(x); },
+                        0x7 => { self.sub_y_from_x(x, y); },
+                        0xE => { self.shift_left(x); },
                         _ => { todo!("Opcode: {:04x}", opcode); },
                     }
                 },
@@ -180,6 +181,15 @@ impl CPU {
         } else {
             self.registers[0xf] = 1;
         }
+    }
+
+    // (8xyE) bitshift VX to the left and store previous most significant bit in VF
+    fn shift_left(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        let previous_msb = x & 0b10000000;
+
+        self.registers[vx as usize] = x << 1;
+        self.registers[0xf] = previous_msb;
     }
 
     // (0000) returns and decrements stack pointer
