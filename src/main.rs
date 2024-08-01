@@ -4,6 +4,7 @@ struct CPU {
     memory: [u8; 0x1000],
     stack: [u16; 16],
     stack_pointer: usize,
+    index_register: u16,
 }
 
 impl CPU {
@@ -59,6 +60,7 @@ impl CPU {
                     }
                 },
                 0x9000..=0x9FFF => { self.sne(x, y); },
+                0xA000..=0xAFFF => { self.set_index(addr); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -203,6 +205,11 @@ impl CPU {
         let call_addr = self.stack[self.stack_pointer];
         self.pc = call_addr as usize;
     }
+
+    // (Annn) set index register to addr nnn
+    fn set_index(&mut self, addr: u16) {
+        self.index_register = addr;
+    }
 }
 
 fn main() {
@@ -212,6 +219,7 @@ fn main() {
         pc: 0,
         stack: [0;16],
         stack_pointer: 0,
+        index_register: 0,
     };
     cpu.registers[0] = 5;
     cpu.registers[1] = 10;
