@@ -15,6 +15,10 @@ impl CPU {
         op_byte1 << 8 | op_byte2
     }
 
+    fn get_register(&self, location: u8) -> u8{
+        self.registers[location as usize]
+    }
+
     fn run(&mut self) {
         loop {
             let opcode = self.read_opcode();
@@ -42,13 +46,14 @@ impl CPU {
                 0x7000..=0x7FFF => { self.add(x, kk); },
                 0x8000..=0x8FFF => {
                     match op_minor {
-                        0 => { self.ld(x, self.registers[y as usize])},
+                        0 => { self.ld(x, self.get_register(y))},
                         1 => { self.or_xy(x, y) },
                         2 => { self.and_xy(x, y) },
                         3 => { self.xor_xy(x, y) },
                         4 => { self.add_xy(x, y); },
                         5 => { self.sub_xy(x, y); },
                         6 => { self.shift_right(x); },
+                        7 => { self.sub_y_from_x(x, y); },
                         _ => { todo!("Opcode: {:04x}", opcode); },
                     }
                 },
@@ -102,32 +107,32 @@ impl CPU {
 
     // (8xy1) bitwise vx or vy and store in vx
     fn or_xy(&mut self, vx: u8, vy: u8) {
-        let x = self.registers[vx as usize];
-        let y = self.registers[vy as usize];
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
 
         self.registers[vx as usize] = x | y;
     }
 
     // (8xy2) bitwise vx and vy and store in vx
     fn and_xy(&mut self, vx: u8, vy: u8) {
-        let x = self.registers[vx as usize];
-        let y = self.registers[vy as usize];
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
 
         self.registers[vx as usize] = x & y;
     }
 
     // (8xy3) bitwise vx xor vy and store in vx
     fn xor_xy(&mut self, vx: u8, vy: u8) {
-        let x = self.registers[vx as usize];
-        let y = self.registers[vy as usize];
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
 
         self.registers[vx as usize] = x ^ y;
     }
 
     // (8xy4) add vy to vx and store in vx with overflow
     fn add_xy(&mut self, vx: u8, vy: u8) {
-        let arg1 = self.registers[vx as usize];
-        let arg2 = self.registers[vy as usize];
+        let arg1 = self.get_register(vx);
+        let arg2 = self.get_register(vy);
 
         let (val, overflow) = arg1.overflowing_add(arg2);
         self.registers[vx as usize] = val;
@@ -141,8 +146,8 @@ impl CPU {
 
     // (8xy5) sub y from vx and store in vx and set VF to 0 if underflow
     fn sub_xy(&mut self, vx: u8, vy: u8) {
-        let arg1 = self.registers[vx as usize];
-        let arg2 = self.registers[vy as usize];
+        let arg1 = self.get_register(vx);
+        let arg2 = self.get_register(vy);
 
         let (val, overflow) = arg1.overflowing_sub(arg2);
         self.registers[vx as usize] = val;
@@ -156,11 +161,25 @@ impl CPU {
 
     // (8xy6) bitshift VX to the right and store previous least significant bit in VF
     fn shift_right(&mut self, vx: u8) {
-        let x = self.registers[vx as usize];
+        let x = self.get_register(vx);
         let previous_lsb = x & 0b00000001;
 
         self.registers[vx as usize] = x >> 1;
         self.registers[0xf] = previous_lsb;
+    }
+
+    // (8xy7) bitshift VX to the right and store previous least significant bit in VF
+    fn sub_y_from_x(&mut self, vx: u8, vy: u8) {
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
+        let (val, overflow) = y.overflowing_sub(x);
+        self.registers[vx as usize] = val;
+
+        if overflow {
+            self.registers[0xf] = 0;
+        } else {
+            self.registers[0xf] = 1;
+        }
     }
 
     // (0000) returns and decrements stack pointer
