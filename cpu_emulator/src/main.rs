@@ -48,6 +48,7 @@ impl CPU {
                         3 => { self.xor_xy(x, y) },
                         4 => { self.add_xy(x, y); },
                         5 => { self.sub_xy(x, y); },
+                        6 => { self.shift_right(x); },
                         _ => { todo!("Opcode: {:04x}", opcode); },
                     }
                 },
@@ -151,6 +152,15 @@ impl CPU {
         } else {
             self.registers[0xf] = 1;
         }
+    }
+
+    // (8xy6) bitshift VX to the right and store previous least significant bit in VF
+    fn shift_right(&mut self, vx: u8) {
+        let x_ = self.registers[vx as usize];
+        let previous_lsb = x_ & 0b00000001;
+
+        self.registers[vx as usize] = x_ >> 1;
+        self.registers[0xf] = previous_lsb;
     }
 
     // (0000) returns and decrements stack pointer
