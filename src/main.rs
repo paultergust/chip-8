@@ -1,3 +1,5 @@
+use rand::Rng;
+
 struct CPU {
     registers: [u8; 16],
     pc: usize,
@@ -62,6 +64,7 @@ impl CPU {
                 0x9000..=0x9FFF => { self.sne(x, y); },
                 0xA000..=0xAFFF => { self.set_index(addr); },
                 0xB000..=0xBFFF => { self.jmp_plus_register(addr); },
+                0xC000..=0xCFFF => { self.rand(x, kk); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -206,6 +209,11 @@ impl CPU {
         self.pc = ((self.registers[0] as u16) + addr) as usize;
     }
 
+    // (Cxnn) bitwise AND between x and nn
+    fn rand(&mut self, x: u8, kk: u8) {
+        self.registers[x as usize] = rand_u8() & kk;
+    }
+
     // (0000) returns and decrements stack pointer
     fn ret(&mut self) {
         if self.stack_pointer == 0 {
@@ -216,6 +224,12 @@ impl CPU {
         let call_addr = self.stack[self.stack_pointer];
         self.pc = call_addr as usize;
     }
+}
+
+fn rand_u8() -> u8 {
+    let mut rng = rand::thread_rng();
+    let r: u8 = rng.gen();
+    r
 }
 
 fn main() {
