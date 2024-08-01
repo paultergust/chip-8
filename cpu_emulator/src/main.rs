@@ -76,61 +76,61 @@ impl CPU {
         self.pc = addr as usize;
     }
 
-    // (3xkk) | (5xy) skip instruction if x equals y or kk
-    fn se(&mut self, x: u8, kk: u8) {
-        if x == kk {
+    // (3xkk) | (5xy) skip instruction if vx equals vy or kk
+    fn se(&mut self, vx: u8, kk: u8) {
+        if vx == kk {
             self.pc += 2;
         }
     }
 
-    // (4xkk) skip if x NOT equal to kk
-    fn sne(&mut self, x: u8, kk: u8) {
-        if x != kk {
+    // (4xkk) skip if vx NOT equal to kk
+    fn sne(&mut self, vx: u8, kk: u8) {
+        if vx != kk {
             self.pc += 2;
         }
     }
     
-    // (6xkk) loads kk into register x
-    fn ld(&mut self, x: u8, kk: u8) {
-        self.registers[x as usize] = kk;
+    // (6xkk) loads kk into register vx
+    fn ld(&mut self, vx: u8, kk: u8) {
+        self.registers[vx as usize] = kk;
     }
 
-    // (7xkk) Adds kk to value stored in register x
-    fn add(&mut self, x: u8, kk: u8) {
-        self.registers[x as usize] += kk;
+    // (7xkk) Adds kk to value stored in register vx
+    fn add(&mut self, vx: u8, kk: u8) {
+        self.registers[vx as usize] += kk;
     }
 
-    // (8xy1) bitwise x or y and store in x
-    fn or_xy(&mut self, x:u8, y: u8) {
-        let _x = self.registers[x as usize];
-        let _y = self.registers[y as usize];
+    // (8xy1) bitwise vx or vy and store in vx
+    fn or_xy(&mut self, vx: u8, vy: u8) {
+        let x = self.registers[vx as usize];
+        let y = self.registers[vy as usize];
 
-        self.registers[x as usize] = _x | _x;
+        self.registers[vx as usize] = x | y;
     }
 
-    // (8xy2) bitwise x and y and store in x
-    fn and_xy(&mut self, x:u8, y: u8) {
-        let _x = self.registers[x as usize];
-        let _y = self.registers[y as usize];
+    // (8xy2) bitwise vx and vy and store in vx
+    fn and_xy(&mut self, vx: u8, vy: u8) {
+        let x = self.registers[vx as usize];
+        let y = self.registers[vy as usize];
 
-        self.registers[x as usize] = _x & _x;
+        self.registers[vx as usize] = x & y;
     }
 
-    // (8xy3) bitwise x xor y and store in x
-    fn xor_xy(&mut self, x:u8, y: u8) {
-        let _x = self.registers[x as usize];
-        let _y = self.registers[y as usize];
+    // (8xy3) bitwise vx xor vy and store in vx
+    fn xor_xy(&mut self, vx: u8, vy: u8) {
+        let x = self.registers[vx as usize];
+        let y = self.registers[vy as usize];
 
-        self.registers[x as usize] = _x ^ _x;
+        self.registers[vx as usize] = x ^ y;
     }
 
-    // (8xy4) add y to x and store in x with overflow
-    fn add_xy(&mut self, x: u8, y: u8) {
-        let arg1 = self.registers[x as usize];
-        let arg2 = self.registers[y as usize];
+    // (8xy4) add vy to vx and store in vx with overflow
+    fn add_xy(&mut self, vx: u8, vy: u8) {
+        let arg1 = self.registers[vx as usize];
+        let arg2 = self.registers[vy as usize];
 
         let (val, overflow) = arg1.overflowing_add(arg2);
-        self.registers[x as usize] = val;
+        self.registers[vx as usize] = val;
 
         if overflow {
             self.registers[0xf] = 1;
@@ -139,13 +139,13 @@ impl CPU {
         }
     }
 
-    // (8xy5) sub y from x and store in x and set VF to 0 if underflow
-    fn sub_xy(&mut self, x: u8, y: u8) {
-        let arg1 = self.registers[x as usize];
-        let arg2 = self.registers[y as usize];
+    // (8xy5) sub y from vx and store in vx and set VF to 0 if underflow
+    fn sub_xy(&mut self, vx: u8, vy: u8) {
+        let arg1 = self.registers[vx as usize];
+        let arg2 = self.registers[vy as usize];
 
         let (val, overflow) = arg1.overflowing_sub(arg2);
-        self.registers[x as usize] = val;
+        self.registers[vx as usize] = val;
 
         if overflow {
             self.registers[0xf] = 0;
@@ -156,10 +156,10 @@ impl CPU {
 
     // (8xy6) bitshift VX to the right and store previous least significant bit in VF
     fn shift_right(&mut self, vx: u8) {
-        let x_ = self.registers[vx as usize];
-        let previous_lsb = x_ & 0b00000001;
+        let x = self.registers[vx as usize];
+        let previous_lsb = x & 0b00000001;
 
-        self.registers[vx as usize] = x_ >> 1;
+        self.registers[vx as usize] = x >> 1;
         self.registers[0xf] = previous_lsb;
     }
 
