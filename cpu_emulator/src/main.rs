@@ -15,6 +15,10 @@ impl CPU {
         op_byte1 << 8 | op_byte2
     }
 
+    fn get_register(&self, location: u8) -> u8{
+        self.registers[location as usize]
+    }
+
     fn run(&mut self) {
         loop {
             let opcode = self.read_opcode();
@@ -23,9 +27,8 @@ impl CPU {
             // let c = ((opcode & 0xF000) >> 12) as u8;
             let x = ((opcode & 0x0F00) >> 8) as u8;
             let y = ((opcode & 0x00F0) >> 4) as u8;
-            let d = ((opcode & 0x000F) >> 0) as u8;
+            // let d = ((opcode & 0x000F) >> 0) as u8;
 
-            let nnn = opcode & 0x0FFF;
             let kk = (opcode & 0x0FF) as u8;
             let op_minor = (opcode & 0x000F) as u8;
             let addr = opcode & 0x0FFF;
@@ -43,11 +46,15 @@ impl CPU {
                 0x7000..=0x7FFF => { self.add(x, kk); },
                 0x8000..=0x8FFF => {
                     match op_minor {
-                        0 => { self.ld(x, self.registers[y as usize])},
-                        1 => { self.or_xy(x, y) },
-                        2 => { self.and_xy(x, y) },
-                        3 => { self.xor_xy(x, y) },
-                        4 => { self.add_xy(x, y); },
+                        0x0 => { self.ld(x, self.get_register(y))},
+                        0x1 => { self.or_xy(x, y) },
+                        0x2 => { self.and_xy(x, y) },
+                        0x3 => { self.xor_xy(x, y) },
+                        0x4 => { self.add_xy(x, y); },
+                        0x5 => { self.sub_xy(x, y); },
+                        0x6 => { self.shift_right(x); },
+                        0x7 => { self.sub_y_from_x(x, y); },
+                        0xE => { self.shift_left(x); },
                         _ => { todo!("Opcode: {:04x}", opcode); },
                     }
                 },
@@ -75,67 +82,114 @@ impl CPU {
         self.pc = addr as usize;
     }
 
-    // (3xkk) | (5xy) skip instruction if x equals y or kk
-    fn se(&mut self, x: u8, kk: u8) {
-        if x == kk {
+    // (3xkk) | (5xy) skip instruction if vx equals vy or kk
+    fn se(&mut self, vx: u8, kk: u8) {
+        if vx == kk {
             self.pc += 2;
         }
     }
 
-    // (4xkk) skip if x NOT equal to kk
-    fn sne(&mut self, x: u8, kk: u8) {
-        if x != kk {
+    // (4xkk) skip if vx NOT equal to kk
+    fn sne(&mut self, vx: u8, kk: u8) {
+        if vx != kk {
             self.pc += 2;
         }
+    }
     
-    // (6xkk) loads kk into register x
-    fn ld(&mut self, x: u8, kk: u8) {
-        self.registers[x as usize] = kk;
+    // (6xkk) loads kk into register vx
+    fn ld(&mut self, vx: u8, kk: u8) {
+        self.registers[vx as usize] = kk;
     }
 
-    // (7xkk) Adds kk to value stored in register x
-    fn add(&mut self, x: u8, kk: u8) {
-        self.registers[x as usize] += kk;
-    }
-    }
-
-    // (8xy1) bitwise x or y and store in x
-    fn or_xy(&mut self, x:u8, y: u8) {
-        let _x = self.registers[x as usize];
-        let _y = self.registers[y as usize];
-
-        self.registers[x as usize] = _x | _x;
+    // (7xkk) Adds kk to value stored in register vx
+    fn add(&mut self, vx: u8, kk: u8) {
+        self.registers[vx as usize] += kk;
     }
 
-    // (8xy2) bitwise x and y and store in x
-    fn and_xy(&mut self, x:u8, y: u8) {
-        let _x = self.registers[x as usize];
-        let _y = self.registers[y as usize];
+    // (8xy1) bitwise vx or vy and store in vx
+    fn or_xy(&mut self, vx: u8, vy: u8) {
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
 
-        self.registers[x as usize] = _x & _x;
+        self.registers[vx as usize] = x | y;
     }
 
-    // (8xy3) bitwise x xor y and store in x
-    fn xor_xy(&mut self, x:u8, y: u8) {
-        let _x = self.registers[x as usize];
-        let _y = self.registers[y as usize];
+    // (8xy2) bitwise vx and vy and store in vx
+    fn and_xy(&mut self, vx: u8, vy: u8) {
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
 
-        self.registers[x as usize] = _x ^ _x;
+        self.registers[vx as usize] = x & y;
     }
 
-    // (8xy4) add y to x and store in x with overflow
-    fn add_xy(&mut self, x: u8, y: u8) {
-        let arg1 = self.registers[x as usize];
-        let arg2 = self.registers[y as usize];
+    // (8xy3) bitwise vx xor vy and store in vx
+    fn xor_xy(&mut self, vx: u8, vy: u8) {
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
+
+        self.registers[vx as usize] = x ^ y;
+    }
+
+    // (8xy4) add vy to vx and store in vx with overflow
+    fn add_xy(&mut self, vx: u8, vy: u8) {
+        let arg1 = self.get_register(vx);
+        let arg2 = self.get_register(vy);
 
         let (val, overflow) = arg1.overflowing_add(arg2);
-        self.registers[x as usize] = val;
+        self.registers[vx as usize] = val;
 
         if overflow {
             self.registers[0xf] = 1;
         } else {
             self.registers[0xf] = 0;
         }
+    }
+
+    // (8xy5) sub y from vx and store in vx and set VF to 0 if underflow
+    fn sub_xy(&mut self, vx: u8, vy: u8) {
+        let arg1 = self.get_register(vx);
+        let arg2 = self.get_register(vy);
+
+        let (val, overflow) = arg1.overflowing_sub(arg2);
+        self.registers[vx as usize] = val;
+
+        if overflow {
+            self.registers[0xf] = 0;
+        } else {
+            self.registers[0xf] = 1;
+        }
+    }
+
+    // (8xy6) bitshift VX to the right and store previous least significant bit in VF
+    fn shift_right(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        let previous_lsb = x & 0b00000001;
+
+        self.registers[vx as usize] = x >> 1;
+        self.registers[0xf] = previous_lsb;
+    }
+
+    // (8xy7) bitshift VX to the right and store previous least significant bit in VF
+    fn sub_y_from_x(&mut self, vx: u8, vy: u8) {
+        let x = self.get_register(vx);
+        let y = self.get_register(vy);
+        let (val, overflow) = y.overflowing_sub(x);
+        self.registers[vx as usize] = val;
+
+        if overflow {
+            self.registers[0xf] = 0;
+        } else {
+            self.registers[0xf] = 1;
+        }
+    }
+
+    // (8xyE) bitshift VX to the left and store previous most significant bit in VF
+    fn shift_left(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        let previous_msb = x & 0b10000000;
+
+        self.registers[vx as usize] = x << 1;
+        self.registers[0xf] = previous_msb;
     }
 
     // (0000) returns and decrements stack pointer
