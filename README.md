@@ -1,3 +1,3 @@
-# Studies
+# CPU Emulator
 
-Random studies on a variety of languages and subjects
+[CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) emulator written in Rust
