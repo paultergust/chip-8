@@ -58,6 +58,7 @@ impl CPU {
                         _ => { todo!("Opcode: {:04x}", opcode); },
                     }
                 },
+                0x9000..=0x9FFF => { self.sne(x, y); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
