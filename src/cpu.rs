@@ -6,6 +6,7 @@ const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 
 pub struct CPU {
     pub registers: [u8; 16],
+    pub keys: [bool; 16],
     pc: usize,
     memory: [u8; 0x1000],
     stack: [u16; 16],
@@ -13,6 +14,7 @@ pub struct CPU {
     index_register: u16,
     gfx: [u8; BUFFER_SIZE],
     draw_flag: bool,
+    dt: u8, // delaytime
 }
 
 impl CPU {
@@ -26,6 +28,8 @@ impl CPU {
             index_register: 0,
             gfx: [0; BUFFER_SIZE],
             draw_flag: false,
+            keys: [false; 16],
+            dt: 0,
         }
     }
 
@@ -85,6 +89,11 @@ impl CPU {
                 0xB000..=0xBFFF => { self.jmp_plus_register(addr); },
                 0xC000..=0xCFFF => { self.rand(x, kk); },
                 0xD000..=0xDFFF => { self.draw_sprite(x, y, d); },
+                0xE09E..=0xEF9E => { self.skp(x); },
+                0xE0A1..=0xEFA1 => { self.sknp(x); },
+                0xF007..=0xFF07 => { self.load_td(x); },
+                0xF00A..=0xFF0A => { self.await_keypress(x); },
+                0xF015..=0xFF15 => { self.set_dt(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -271,6 +280,45 @@ impl CPU {
         self.draw_flag = true;
     }
 
+    // Ex9E skip next instruction if key is pressed
+    fn skp(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        if self.keys[x as usize] {
+            self.pc += 2;
+        }
+    }
+
+    // ExA1 skip next instruction if key is NOT pressed
+    fn sknp(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        if !self.keys[x as usize] {
+            self.pc += 2;
+        }
+    }
+
+    // Fx07 loads the dt value into Vx
+    fn load_td(&mut self, vx: u8) {
+        self.registers[vx as usize] = self.dt;
+    }
+
+    // Fx0A wait for keypress
+    fn await_keypress(&mut self, vx: u8) {
+        // check each key
+        for i in 0..self.keys.len() {
+            if self.keys[i] {
+                self.registers[vx as usize] = i as u8;
+                return;
+            }
+        }
+        // if none is pressed, jmp to previous instruction (recursion)
+        self.pc -= 2;
+    }
+
+    // Fx15 loads the value of Vx into dt
+    fn set_dt(&mut self, vx: u8) {
+        self.dt = self.get_register(vx);
+    }
+
     // (0000) returns and decrements stack pointer
     fn ret(&mut self) {
         if self.stack_pointer == 0 {
@@ -284,6 +332,10 @@ impl CPU {
 
     pub fn memory(self) -> [u8; 0x1000] {
         self.memory
+    }
+
+    pub fn set_key(&mut self, key: usize, pressed: bool) {
+        self.keys[key] = pressed;
     }
 }
 
