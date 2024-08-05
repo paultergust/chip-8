@@ -92,6 +92,7 @@ impl CPU {
                 0xE09E..=0xEF9E => { self.skp(x); },
                 0xE0A1..=0xEFA1 => { self.sknp(x); },
                 0xF007..=0xFF07 => { self.load_td(x); },
+                0xF00A..=0xFF0A => { self.await_keypress(x); },
                 0xF015..=0xFF15 => { self.set_dt(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
@@ -298,6 +299,19 @@ impl CPU {
     // Fx07 loads the dt value into Vx
     fn load_td(&mut self, vx: u8) {
         self.registers[vx as usize] = self.dt;
+    }
+
+    // Fx0A wait for keypress
+    fn await_keypress(&mut self, vx: u8) {
+        // check each key
+        for i in 0..self.keys.len() {
+            if self.keys[i] {
+                self.registers[vx as usize] = i as u8;
+                return;
+            }
+        }
+        // if none is pressed, jmp to previous instruction (recursion)
+        self.pc -= 2;
     }
 
     // Fx15 loads the value of Vx into dt
