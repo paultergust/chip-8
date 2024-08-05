@@ -14,6 +14,7 @@ pub struct CPU {
     index_register: u16,
     gfx: [u8; BUFFER_SIZE],
     draw_flag: bool,
+    dt: u8, // delaytime
 }
 
 impl CPU {
@@ -28,6 +29,7 @@ impl CPU {
             gfx: [0; BUFFER_SIZE],
             draw_flag: false,
             keys: [false; 16],
+            dt: 0,
         }
     }
 
@@ -89,6 +91,8 @@ impl CPU {
                 0xD000..=0xDFFF => { self.draw_sprite(x, y, d); },
                 0xE09E..=0xEF9E => { self.skp(x); },
                 0xE0A1..=0xEFA1 => { self.sknp(x); },
+                0xF007..=0xFF07 => { self.load_td(x); },
+                0xF015..=0xFF15 => { self.set_dt(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -289,6 +293,16 @@ impl CPU {
         if !self.keys[x as usize] {
             self.pc += 2;
         }
+    }
+
+    // Fx07 loads the dt value into Vx
+    fn load_td(&mut self, vx: u8) {
+        self.registers[vx as usize] = self.dt;
+    }
+
+    // Fx15 loads the value of Vx into dt
+    fn set_dt(&mut self, vx: u8) {
+        self.dt = self.get_register(vx);
     }
 
     // (0000) returns and decrements stack pointer
