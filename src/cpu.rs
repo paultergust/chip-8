@@ -1,7 +1,8 @@
 use rand::Rng;
 
-const SCREEN_HEIGHT: usize = 600;
-const SCREEN_WIDTH: usize = 800;
+const SCREEN_HEIGHT: u8 = 32;
+const SCREEN_WIDTH: u8 = 64;
+const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 
 pub struct CPU {
     pub registers: [u8; 16],
@@ -10,7 +11,7 @@ pub struct CPU {
     stack: [u16; 16],
     stack_pointer: usize,
     index_register: u16,
-    gfx: [u8; SCREEN_HEIGHT * SCREEN_WIDTH],
+    gfx: [u8; BUFFER_SIZE],
     draw_flag: bool,
 }
 
@@ -23,7 +24,7 @@ impl CPU {
             stack: [0;16],
             stack_pointer: 0,
             index_register: 0,
-            gfx: [0; SCREEN_HEIGHT * SCREEN_WIDTH],
+            gfx: [0; BUFFER_SIZE],
             draw_flag: false,
         }
     }
@@ -48,7 +49,7 @@ impl CPU {
             // let c = ((opcode & 0xF000) >> 12) as u8;
             let x = ((opcode & 0x0F00) >> 8) as u8;
             let y = ((opcode & 0x00F0) >> 4) as u8;
-            // let d = ((opcode & 0x000F) >> 0) as u8;
+            let d = ((opcode & 0x000F) >> 0) as u8;
 
             let kk = (opcode & 0x0FF) as u8;
             let op_minor = (opcode & 0x000F) as u8;
@@ -83,6 +84,7 @@ impl CPU {
                 0xA000..=0xAFFF => { self.set_index(addr); },
                 0xB000..=0xBFFF => { self.jmp_plus_register(addr); },
                 0xC000..=0xCFFF => { self.rand(x, kk); },
+                0xD000..=0xDFFF => { self.draw_sprite(x, y, d); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -230,6 +232,43 @@ impl CPU {
     // (Cxnn) bitwise AND between x and nn
     fn rand(&mut self, x: u8, kk: u8) {
         self.registers[x as usize] = rand_u8() & kk;
+    }
+
+    // (Dxyn) Draw a N sized sprite (I) to point (vx, vy)
+    fn draw_sprite(&mut self, x: u8, y: u8, height: u8) {
+        let vx = self.get_register(x);
+        let vy = self.get_register(y);
+
+        // Wrap coordinates around the screen dimensions
+        let vx = vx % SCREEN_WIDTH;
+        let vy = vy % SCREEN_HEIGHT;
+
+        // Set VF to 0 before drawing
+        self.registers[0xF] = 0;
+
+        for byte in 0..height {
+            let y_coord = (vy + byte) % SCREEN_HEIGHT;
+            let sprite_line = self.memory[(self.index_register + byte as u16) as usize];
+
+            for bit in 0..8 {
+                let x_coord = (vx + bit) % SCREEN_WIDTH;
+                let pixel = (sprite_line >> (7 - bit)) & 1;
+
+                let idx = y_coord * SCREEN_WIDTH + x_coord;
+                let screen_pixel = self.gfx[idx as usize];
+
+                // Collision detection
+                if screen_pixel == 1 && pixel == 1 {
+                    self.registers[0xF] = 1;
+                }
+
+                // XOR operation to draw the pixel
+                self.gfx[idx as usize] ^= pixel;
+            }
+        }
+
+        // Set the draw flag to true to update the display
+        self.draw_flag = true;
     }
 
     // (0000) returns and decrements stack pointer
