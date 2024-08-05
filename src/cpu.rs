@@ -6,6 +6,7 @@ const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 
 pub struct CPU {
     pub registers: [u8; 16],
+    pub keys: [bool; 16],
     pc: usize,
     memory: [u8; 0x1000],
     stack: [u16; 16],
@@ -26,6 +27,7 @@ impl CPU {
             index_register: 0,
             gfx: [0; BUFFER_SIZE],
             draw_flag: false,
+            keys: [false; 16],
         }
     }
 
@@ -85,6 +87,8 @@ impl CPU {
                 0xB000..=0xBFFF => { self.jmp_plus_register(addr); },
                 0xC000..=0xCFFF => { self.rand(x, kk); },
                 0xD000..=0xDFFF => { self.draw_sprite(x, y, d); },
+                0xE09E..=0xEF9E => { self.skp(x); },
+                0xE0A1..=0xEFA1 => { self.sknp(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -271,6 +275,22 @@ impl CPU {
         self.draw_flag = true;
     }
 
+    // Ex9E skip next instruction if key is pressed
+    fn skp(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        if self.keys[x as usize] {
+            self.pc += 2;
+        }
+    }
+
+    // ExA1 skip next instruction if key is NOT pressed
+    fn sknp(&mut self, vx: u8) {
+        let x = self.get_register(vx);
+        if !self.keys[x as usize] {
+            self.pc += 2;
+        }
+    }
+
     // (0000) returns and decrements stack pointer
     fn ret(&mut self) {
         if self.stack_pointer == 0 {
@@ -284,6 +304,10 @@ impl CPU {
 
     pub fn memory(self) -> [u8; 0x1000] {
         self.memory
+    }
+
+    pub fn set_key(&mut self, key: usize, pressed: bool) {
+        self.keys[key] = pressed;
     }
 }
 

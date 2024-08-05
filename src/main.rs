@@ -1,5 +1,5 @@
 mod cpu;
-mod frames;
+mod io_handler;
 use crate::cpu::CPU;
 
 fn main() {
