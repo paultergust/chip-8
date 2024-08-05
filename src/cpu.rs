@@ -243,6 +243,7 @@ impl CPU {
         self.registers[x as usize] = rand_u8() & kk;
     }
 
+<<<<<<< HEAD
     // (Dxyn) Draw a N sized sprite (I) to point (vx, vy)
     fn draw_sprite(&mut self, x: u8, y: u8, height: u8) {
         let vx = self.get_register(x);
