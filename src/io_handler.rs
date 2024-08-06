@@ -5,23 +5,10 @@ const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
 const SCALE: usize = 10;
 
-// fn draw(index: u8) {
-//    handle_input(&cpu, &window)
-//    if cpu.draw_flag {
-//        cpu.draw_flag = false;
-//    }
-//}
-
-fn draw_sprite(buffer: &mut Vec<u32>, x: usize, y: usize, sprite: &[u8]) {
-    for (row, &byte) in sprite.iter().enumerate() {
-        for bit in 0..8 {
-            if (byte & (0x80 >> bit)) != 0 {
-                let pixel_x = (x + bit) % SCREEN_WIDTH;
-                let pixel_y = (y + row) % SCREEN_HEIGHT;
-                let index = pixel_y * SCREEN_WIDTH + pixel_x;
-                buffer[index] = 0xFFFFFF; // White pixel
-            }
-        }
+fn draw(gfx: [u8; SCREEN_WIDTH * SCREEN_HEIGHT], buffer: &mut Vec<u32>) {
+    for (i, &pixel) in gfx.iter().enumerate() {
+        let color = if pixel == 1 { 0xFFFFFF } else { 0x000000 };
+        buffer[i] = color;
     }
 }
 
