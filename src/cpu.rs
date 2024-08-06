@@ -7,6 +7,7 @@ const SCREEN_HEIGHT: u8 = 32;
 const SCREEN_WIDTH: u8 = 64;
 const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 const SCALE: usize = 10;
+const FPS: usize = 120;
 
 const FONTSET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -37,7 +38,6 @@ pub struct CPU {
     stack_pointer: usize,
     index_register: u16,
     gfx: [u8; BUFFER_SIZE],
-    draw_flag: bool,
     dt: u8, // delaytime
     st: u8, // sound timer
 }
@@ -58,7 +58,6 @@ impl CPU {
             stack_pointer: 0,
             index_register: 0,
             gfx: [0; BUFFER_SIZE],
-            draw_flag: false,
             keys: [false; 16],
             dt: 0,
             st: 0,
@@ -103,7 +102,7 @@ impl CPU {
 
             match opcode {
                 0x0000 => { return; }
-                0x00E0 => { /* clear screen */ }
+                0x00E0 => { self.clear_screen(); }
                 0x00EE => { self.ret(); }
                 0x1000..=0x1FFF => { self.jmp(addr); },
                 0x2000..=0x2FFF => { self.call(addr); },
@@ -146,6 +145,7 @@ impl CPU {
             }
             let buffer = IOHandler::draw(&self.gfx);
             IOHandler::handle_input(self);
+            self.window.set_target_fps(FPS);
             self.window.update_with_buffer(&buffer, SCREEN_WIDTH.into(), SCREEN_HEIGHT.into()).unwrap();
         }
     }
@@ -340,9 +340,6 @@ impl CPU {
                 self.gfx[idx as usize] ^= pixel;
             }
         }
-
-        // Set the draw flag to true to update the display
-        self.draw_flag = true;
     }
 
     // Ex9E skip next instruction if key is pressed
@@ -432,6 +429,10 @@ impl CPU {
         self.stack_pointer -= 1;
         let call_addr = self.stack[self.stack_pointer];
         self.pc = call_addr as usize;
+    }
+
+    fn clear_screen(&mut self) {
+        self.gfx.iter_mut().for_each(|pixel| *pixel = 0);
     }
 
     pub fn memory(self) -> [u8; 0x1000] {
