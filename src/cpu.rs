@@ -4,6 +4,25 @@ const SCREEN_HEIGHT: u8 = 32;
 const SCREEN_WIDTH: u8 = 64;
 const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 
+const FONTSET: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+];
+
 pub struct CPU {
     pub registers: [u8; 16],
     pub keys: [bool; 16],
@@ -20,7 +39,7 @@ pub struct CPU {
 
 impl CPU {
     pub fn new() -> CPU {
-        CPU {
+        let mut cpu = CPU {
             registers: [0; 16],
             memory: [0; 0x1000],
             pc: 0,
@@ -32,7 +51,14 @@ impl CPU {
             keys: [false; 16],
             dt: 0,
             st: 0,
-        }
+        };
+        cpu.load_fontset();
+        cpu
+    }
+
+    fn load_fontset(&mut self) {
+        self.memory[0..0x50 + FONTSET.len()].copy_from_slice(&FONTSET);
+
     }
 
     fn read_opcode(&self) -> u16 {
@@ -98,6 +124,7 @@ impl CPU {
                 0xF015..=0xFF15 => { self.set_dt(x); },
                 0xF018..=0xFF18 => { self.set_st(x); },
                 0xF01E..=0xFF1E => { self.add_vx_to_index(x); },
+                0xF029..=0xFF29 => { self.index_digit(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -331,6 +358,11 @@ impl CPU {
     // Fx1E add I to Vx and store in I
     fn add_vx_to_index(&mut self, vx: u8) {
         self.index_register += self.get_register(vx) as u16;
+    }
+
+    // Fx29 set I to adress of digit sprit at Vx
+    fn index_digit(&mut self, vx: u8) {
+        self.index_register = (self.memory[vx as usize] as u16) * 5 + 0x50;
     }
 
     // (0000) returns and decrements stack pointer
