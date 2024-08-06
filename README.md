@@ -46,3 +46,7 @@ Q W E R
 A S D F
 Z X C V
 ```
+
+### Shout-out
+
+[This page](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM) by Thomas Greene helped me a lot in developing this.
