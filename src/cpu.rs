@@ -143,10 +143,7 @@ impl CPU {
                 0xF065..=0xFF65 => { self.read_registers(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
-            let buffer = IOHandler::draw(&self.gfx);
             IOHandler::handle_input(self);
-            self.window.set_target_fps(FPS);
-            self.window.update_with_buffer(&buffer, SCREEN_WIDTH.into(), SCREEN_HEIGHT.into()).unwrap();
         }
     }
 
@@ -340,6 +337,8 @@ impl CPU {
                 self.gfx[idx as usize] ^= pixel;
             }
         }
+        let buffer = IOHandler::draw(&self.gfx);
+        self.window.update_with_buffer(&buffer, SCREEN_WIDTH.into(), SCREEN_HEIGHT.into()).unwrap();
     }
 
     // Ex9E skip next instruction if key is pressed
