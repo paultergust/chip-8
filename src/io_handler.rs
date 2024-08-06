@@ -1,14 +1,13 @@
 use crate::cpu::CPU;
-use minifb::{Key, Window, WindowOptions};
+use minifb::Key;
 
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
-const SCALE: usize = 10;
 
 pub struct IOHandler;
 impl IOHandler {
     pub fn draw(gfx: &[u8; SCREEN_WIDTH * SCREEN_HEIGHT]) -> Vec<u32> {
-        let mut buffer = Vec::new();
+        let mut buffer = vec![0; gfx.len()];
         for (i, &pixel) in gfx.iter().enumerate() {
             let color = if pixel == 1 { 0xFFFFFF } else { 0x000000 };
             buffer[i] = color;
@@ -32,7 +31,7 @@ fn draw_sprite(buffer: &mut Vec<u32>, x: usize, y: usize, sprite: &[u8]) {
 fn handle_input(chip8: &mut CPU, window: &Window) {
     chip8.keys.iter_mut().for_each(|k| *k = false);
 
-        for key in window.get_keys_pressed(minifb::KeyRepeat::No) {
+        for key in chip8.window.get_keys_pressed(minifb::KeyRepeat::No) {
             if let Some(index) = IOHandler::get_key_index(key) {
                 chip8.set_key(index, true);
             }

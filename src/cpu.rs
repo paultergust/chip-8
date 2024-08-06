@@ -30,6 +30,7 @@ const FONTSET: [u8; 80] = [
 pub struct CPU {
     pub registers: [u8; 16],
     pub keys: [bool; 16],
+    pub window: Window,
     pc: usize,
     memory: [u8; 0x1000],
     stack: [u16; 16],
@@ -39,12 +40,11 @@ pub struct CPU {
     draw_flag: bool,
     dt: u8, // delaytime
     st: u8, // sound timer
-    window: Window,
 }
 
 impl CPU {
     pub fn new() -> CPU {
-        let mut window = Window::new(
+        let window = Window::new(
             "CHIP-8",
             SCREEN_WIDTH as usize * SCALE,
             SCREEN_HEIGHT as usize * SCALE,
@@ -69,8 +69,10 @@ impl CPU {
     }
 
     fn load_fontset(&mut self) {
-        self.memory[0..0x50 + FONTSET.len()].copy_from_slice(&FONTSET);
-
+        let begin = 0x50;
+        for i in 0..FONTSET.len() {
+            self.memory[begin + i] = FONTSET[i];
+        }
     }
 
     fn read_opcode(&self) -> u16 {
@@ -143,6 +145,7 @@ impl CPU {
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
             let buffer = IOHandler::draw(&self.gfx);
+            IOHandler::handle_input(self);
             self.window.update_with_buffer(&buffer, SCREEN_WIDTH.into(), SCREEN_HEIGHT.into()).unwrap();
         }
     }
@@ -299,33 +302,41 @@ impl CPU {
 
     // (Dxyn) Draw a N sized sprite (I) to point (vx, vy)
     fn draw_sprite(&mut self, x: u8, y: u8, height: u8) {
-        let vx = self.get_register(x);
-        let vy = self.get_register(y);
+        let h = SCREEN_HEIGHT as usize;
+        let w = SCREEN_WIDTH as usize;
+        // Retrieve the coordinates from the registers
+        let vx = self.get_register(x) as usize;
+        let vy = self.get_register(y) as usize;
 
         // Wrap coordinates around the screen dimensions
-        let vx = vx % SCREEN_WIDTH;
-        let vy = vy % SCREEN_HEIGHT;
+        let vx = vx % w;
+        let vy = vy % h;
 
         // Set VF to 0 before drawing
         self.registers[0xF] = 0;
 
         for byte in 0..height {
-            let y_coord = (vy + byte) % SCREEN_HEIGHT;
+            // Calculate the y coordinate for the current row of the sprite
+            let y_coord = (vy + byte as usize) % h;
+
+            // Retrieve the current line of the sprite
             let sprite_line = self.memory[(self.index_register + byte as u16) as usize];
 
             for bit in 0..8 {
-                let x_coord = (vx + bit) % SCREEN_WIDTH;
+                // Calculate the x coordinate for the current pixel
+                let x_coord = (vx + bit as usize) % w;
                 let pixel = (sprite_line >> (7 - bit)) & 1;
 
-                let idx = y_coord * SCREEN_WIDTH + x_coord;
+                // Determine the index in the framebuffer
+                let idx = y_coord * w + x_coord;
                 let screen_pixel = self.gfx[idx as usize];
 
                 // Collision detection
                 if screen_pixel == 1 && pixel == 1 {
-                    self.registers[0xF] = 1;
+                    self.registers[0xF] = 1; // Set VF to 1 if there is a collision
                 }
 
-                // XOR operation to draw the pixel
+                // XOR operation to draw the pixel (flip the pixel)
                 self.gfx[idx as usize] ^= pixel;
             }
         }
