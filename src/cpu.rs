@@ -1,8 +1,13 @@
 use rand::Rng;
+use minifb::{Key, Window, WindowOptions};
+
+use crate::io_handler::IOHandler;
 
 const SCREEN_HEIGHT: u8 = 32;
 const SCREEN_WIDTH: u8 = 64;
 const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
+const SCALE: usize = 10;
+const FPS: usize = 120;
 
 const FONTSET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -26,39 +31,47 @@ const FONTSET: [u8; 80] = [
 pub struct CPU {
     pub registers: [u8; 16],
     pub keys: [bool; 16],
+    pub window: Window,
     pc: usize,
     memory: [u8; 0x1000],
     stack: [u16; 16],
     stack_pointer: usize,
     index_register: u16,
     gfx: [u8; BUFFER_SIZE],
-    draw_flag: bool,
     dt: u8, // delaytime
     st: u8, // sound timer
 }
 
 impl CPU {
     pub fn new() -> CPU {
+        let window = Window::new(
+            "CHIP-8",
+            SCREEN_WIDTH as usize * SCALE,
+            SCREEN_HEIGHT as usize * SCALE,
+            WindowOptions::default(),
+        ).unwrap();
         let mut cpu = CPU {
             registers: [0; 16],
             memory: [0; 0x1000],
-            pc: 0,
+            pc: 0x200,
             stack: [0;16],
             stack_pointer: 0,
             index_register: 0,
             gfx: [0; BUFFER_SIZE],
-            draw_flag: false,
             keys: [false; 16],
             dt: 0,
             st: 0,
+            window,
         };
         cpu.load_fontset();
         cpu
     }
 
     fn load_fontset(&mut self) {
-        self.memory[0..0x50 + FONTSET.len()].copy_from_slice(&FONTSET);
-
+        let begin = 0x50;
+        for i in 0..FONTSET.len() {
+            self.memory[begin + i] = FONTSET[i];
+        }
     }
 
     fn read_opcode(&self) -> u16 {
@@ -74,7 +87,7 @@ impl CPU {
     }
 
     pub fn run(&mut self) {
-        loop {
+        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             let opcode = self.read_opcode();
             self.pc += 2;
 
@@ -89,7 +102,7 @@ impl CPU {
 
             match opcode {
                 0x0000 => { return; }
-                0x00E0 => { /* clear screen */ }
+                0x00E0 => { self.clear_screen(); }
                 0x00EE => { self.ret(); }
                 0x1000..=0x1FFF => { self.jmp(addr); },
                 0x2000..=0x2FFF => { self.call(addr); },
@@ -130,6 +143,16 @@ impl CPU {
                 0xF065..=0xFF65 => { self.read_registers(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
+            let buffer = IOHandler::draw(&self.gfx);
+            IOHandler::handle_input(self);
+            self.window.set_target_fps(FPS);
+            self.window.update_with_buffer(&buffer, SCREEN_WIDTH.into(), SCREEN_HEIGHT.into()).unwrap();
+        }
+    }
+
+    pub fn load_program(&mut self, program: Vec<u8>) {
+        for (i, byte) in program.iter().enumerate() {
+            self.memory[self.pc + i] = *byte;
         }
     }
 
@@ -279,39 +302,44 @@ impl CPU {
 
     // (Dxyn) Draw a N sized sprite (I) to point (vx, vy)
     fn draw_sprite(&mut self, x: u8, y: u8, height: u8) {
-        let vx = self.get_register(x);
-        let vy = self.get_register(y);
+        let h = SCREEN_HEIGHT as usize;
+        let w = SCREEN_WIDTH as usize;
+        // Retrieve the coordinates from the registers
+        let vx = self.get_register(x) as usize;
+        let vy = self.get_register(y) as usize;
 
         // Wrap coordinates around the screen dimensions
-        let vx = vx % SCREEN_WIDTH;
-        let vy = vy % SCREEN_HEIGHT;
+        let vx = vx % w;
+        let vy = vy % h;
 
         // Set VF to 0 before drawing
         self.registers[0xF] = 0;
 
         for byte in 0..height {
-            let y_coord = (vy + byte) % SCREEN_HEIGHT;
+            // Calculate the y coordinate for the current row of the sprite
+            let y_coord = (vy + byte as usize) % h;
+
+            // Retrieve the current line of the sprite
             let sprite_line = self.memory[(self.index_register + byte as u16) as usize];
 
             for bit in 0..8 {
-                let x_coord = (vx + bit) % SCREEN_WIDTH;
+                // Calculate the x coordinate for the current pixel
+                let x_coord = (vx + bit as usize) % w;
                 let pixel = (sprite_line >> (7 - bit)) & 1;
 
-                let idx = y_coord * SCREEN_WIDTH + x_coord;
+                // Determine the index in the framebuffer
+                let idx = y_coord * w + x_coord;
                 let screen_pixel = self.gfx[idx as usize];
 
                 // Collision detection
                 if screen_pixel == 1 && pixel == 1 {
-                    self.registers[0xF] = 1;
+                    self.registers[0xF] = 1; // Set VF to 1 if there is a collision
                 }
 
-                // XOR operation to draw the pixel
+                // XOR operation to draw the pixel (flip the pixel)
                 self.gfx[idx as usize] ^= pixel;
             }
         }
-
-        // Set the draw flag to true to update the display
-        self.draw_flag = true;
     }
 
     // Ex9E skip next instruction if key is pressed
@@ -401,6 +429,10 @@ impl CPU {
         self.stack_pointer -= 1;
         let call_addr = self.stack[self.stack_pointer];
         self.pc = call_addr as usize;
+    }
+
+    fn clear_screen(&mut self) {
+        self.gfx.iter_mut().for_each(|pixel| *pixel = 0);
     }
 
     pub fn memory(self) -> [u8; 0x1000] {
