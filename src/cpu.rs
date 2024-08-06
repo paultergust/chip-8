@@ -125,6 +125,7 @@ impl CPU {
                 0xF018..=0xFF18 => { self.set_st(x); },
                 0xF01E..=0xFF1E => { self.add_vx_to_index(x); },
                 0xF029..=0xFF29 => { self.index_digit(x); },
+                0xF033..=0xFF33 => { self.bcd_to_i(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -363,6 +364,14 @@ impl CPU {
     // Fx29 set I to adress of digit sprit at Vx
     fn index_digit(&mut self, vx: u8) {
         self.index_register = (self.memory[vx as usize] as u16) * 5 + 0x50;
+    }
+
+    // Fx33 Store BCD representation of Vx in memory locations I, I+1, and I+2.
+    fn bcd_to_i(&mut self, vx: u8) {
+        let value = self.get_register(vx);
+        self.memory[self.index_register as usize] = value / 100;
+        self.memory[self.index_register as usize + 1] = (value / 10) % 10;
+        self.memory[self.index_register as usize + 2] = value % 10;
     }
 
     // (0000) returns and decrements stack pointer
