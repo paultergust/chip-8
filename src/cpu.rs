@@ -40,6 +40,7 @@ pub struct CPU {
     gfx: [u8; BUFFER_SIZE],
     dt: u8, // delaytime
     st: u8, // sound timer
+    window: Window,
 }
 
 impl CPU {
