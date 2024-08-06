@@ -15,6 +15,7 @@ pub struct CPU {
     gfx: [u8; BUFFER_SIZE],
     draw_flag: bool,
     dt: u8, // delaytime
+    st: u8, // sound timer
 }
 
 impl CPU {
@@ -30,6 +31,7 @@ impl CPU {
             draw_flag: false,
             keys: [false; 16],
             dt: 0,
+            st: 0,
         }
     }
 
@@ -94,6 +96,8 @@ impl CPU {
                 0xF007..=0xFF07 => { self.load_td(x); },
                 0xF00A..=0xFF0A => { self.await_keypress(x); },
                 0xF015..=0xFF15 => { self.set_dt(x); },
+                0xF018..=0xFF18 => { self.set_st(x); },
+                0xF01E..=0xFF1E => { self.add_vx_to_index(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -317,6 +321,16 @@ impl CPU {
     // Fx15 loads the value of Vx into dt
     fn set_dt(&mut self, vx: u8) {
         self.dt = self.get_register(vx);
+    }
+
+    // Fx18 loads the value of Vx into st
+    fn set_st(&mut self, vx: u8) {
+        self.st = self.get_register(vx);
+    }
+
+    // Fx1E add I to Vx and store in I
+    fn add_vx_to_index(&mut self, vx: u8) {
+        self.index_register += self.get_register(vx) as u16;
     }
 
     // (0000) returns and decrements stack pointer
