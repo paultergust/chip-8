@@ -47,6 +47,21 @@ A S D F
 Z X C V
 ```
 
+### How to write code for it
+
+Simply write each opcode (with instruction and data) as a 16-bit hexcode line-by-line. Example:
+
+```
+A000
+A050
+6000
+6000
+D015
+1202
+```
+
+Currently, it supports neither assembly sintax nor comments on "src code". But these will be implemented in the near future.
+
 ### Shout-out
 
 [This page](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM) by Thomas Greene helped me a lot in developing this.
