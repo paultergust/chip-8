@@ -126,6 +126,8 @@ impl CPU {
                 0xF01E..=0xFF1E => { self.add_vx_to_index(x); },
                 0xF029..=0xFF29 => { self.index_digit(x); },
                 0xF033..=0xFF33 => { self.bcd_to_i(x); },
+                0xF055..=0xFF55 => { self.load_registers(x); },
+                0xF065..=0xFF65 => { self.read_registers(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -372,6 +374,22 @@ impl CPU {
         self.memory[self.index_register as usize] = value / 100;
         self.memory[self.index_register as usize + 1] = (value / 10) % 10;
         self.memory[self.index_register as usize + 2] = value % 10;
+    }
+
+    // Fx55 read V0 to Vx and store into I..I+x
+    fn load_registers(&mut self, vx:u8) {
+        let index_start:usize = self.index_register.into();
+        for i in 0..vx {
+            self.memory[index_start + i as usize] = self.get_register(i);
+        }
+    }
+
+    // Fx65 Store into V0 to Vx values from I..I+x
+    fn read_registers(&mut self, vx:u8) {
+        let index_start:usize = self.index_register.into();
+        for i in 0..vx {
+            self.registers[i as usize] = self.memory[index_start + i as usize];
+        }
     }
 
     // (0000) returns and decrements stack pointer
