@@ -4,6 +4,25 @@ const SCREEN_HEIGHT: u8 = 32;
 const SCREEN_WIDTH: u8 = 64;
 const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 
+const FONTSET: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+    0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+];
+
 pub struct CPU {
     pub registers: [u8; 16],
     pub keys: [bool; 16],
@@ -15,11 +34,12 @@ pub struct CPU {
     gfx: [u8; BUFFER_SIZE],
     draw_flag: bool,
     dt: u8, // delaytime
+    st: u8, // sound timer
 }
 
 impl CPU {
     pub fn new() -> CPU {
-        CPU {
+        let mut cpu = CPU {
             registers: [0; 16],
             memory: [0; 0x1000],
             pc: 0,
@@ -30,7 +50,15 @@ impl CPU {
             draw_flag: false,
             keys: [false; 16],
             dt: 0,
-        }
+            st: 0,
+        };
+        cpu.load_fontset();
+        cpu
+    }
+
+    fn load_fontset(&mut self) {
+        self.memory[0..0x50 + FONTSET.len()].copy_from_slice(&FONTSET);
+
     }
 
     fn read_opcode(&self) -> u16 {
@@ -94,6 +122,12 @@ impl CPU {
                 0xF007..=0xFF07 => { self.load_td(x); },
                 0xF00A..=0xFF0A => { self.await_keypress(x); },
                 0xF015..=0xFF15 => { self.set_dt(x); },
+                0xF018..=0xFF18 => { self.set_st(x); },
+                0xF01E..=0xFF1E => { self.add_vx_to_index(x); },
+                0xF029..=0xFF29 => { self.index_digit(x); },
+                0xF033..=0xFF33 => { self.bcd_to_i(x); },
+                0xF055..=0xFF55 => { self.load_registers(x); },
+                0xF065..=0xFF65 => { self.read_registers(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
         }
@@ -317,6 +351,45 @@ impl CPU {
     // Fx15 loads the value of Vx into dt
     fn set_dt(&mut self, vx: u8) {
         self.dt = self.get_register(vx);
+    }
+
+    // Fx18 loads the value of Vx into st
+    fn set_st(&mut self, vx: u8) {
+        self.st = self.get_register(vx);
+    }
+
+    // Fx1E add I to Vx and store in I
+    fn add_vx_to_index(&mut self, vx: u8) {
+        self.index_register += self.get_register(vx) as u16;
+    }
+
+    // Fx29 set I to adress of digit sprit at Vx
+    fn index_digit(&mut self, vx: u8) {
+        self.index_register = (self.memory[vx as usize] as u16) * 5 + 0x50;
+    }
+
+    // Fx33 Store BCD representation of Vx in memory locations I, I+1, and I+2.
+    fn bcd_to_i(&mut self, vx: u8) {
+        let value = self.get_register(vx);
+        self.memory[self.index_register as usize] = value / 100;
+        self.memory[self.index_register as usize + 1] = (value / 10) % 10;
+        self.memory[self.index_register as usize + 2] = value % 10;
+    }
+
+    // Fx55 read V0 to Vx and store into I..I+x
+    fn load_registers(&mut self, vx:u8) {
+        let index_start:usize = self.index_register.into();
+        for i in 0..vx {
+            self.memory[index_start + i as usize] = self.get_register(i);
+        }
+    }
+
+    // Fx65 Store into V0 to Vx values from I..I+x
+    fn read_registers(&mut self, vx:u8) {
+        let index_start:usize = self.index_register.into();
+        for i in 0..vx {
+            self.registers[i as usize] = self.memory[index_start + i as usize];
+        }
     }
 
     // (0000) returns and decrements stack pointer

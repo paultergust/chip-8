@@ -1,12 +1,16 @@
 use crate::cpu::CPU;
 use minifb::{Key, Window, WindowOptions};
 
-// fn draw(index: u8) {
-//    handle_input(&cpu, &window)
-//    if cpu.draw_flag {
-//        cpu.draw_flag = false;
-//    }
-//}
+const SCREEN_WIDTH: usize = 64;
+const SCREEN_HEIGHT: usize = 32;
+const SCALE: usize = 10;
+
+fn draw(gfx: [u8; SCREEN_WIDTH * SCREEN_HEIGHT], buffer: &mut Vec<u32>) {
+    for (i, &pixel) in gfx.iter().enumerate() {
+        let color = if pixel == 1 { 0xFFFFFF } else { 0x000000 };
+        buffer[i] = color;
+    }
+}
 
 fn handle_input(chip8: &mut CPU, window: &Window) {
     chip8.keys.iter_mut().for_each(|k| *k = false);
