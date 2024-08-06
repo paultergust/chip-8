@@ -1,8 +1,12 @@
 use rand::Rng;
+use minifb::{Key, Window, WindowOptions};
+
+use crate::io_handler::IOHandler;
 
 const SCREEN_HEIGHT: u8 = 32;
 const SCREEN_WIDTH: u8 = 64;
 const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
+const SCALE: usize = 10;
 
 const FONTSET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -35,14 +39,21 @@ pub struct CPU {
     draw_flag: bool,
     dt: u8, // delaytime
     st: u8, // sound timer
+    window: Window,
 }
 
 impl CPU {
     pub fn new() -> CPU {
+        let mut window = Window::new(
+            "CHIP-8",
+            SCREEN_WIDTH as usize * SCALE,
+            SCREEN_HEIGHT as usize * SCALE,
+            WindowOptions::default(),
+        ).unwrap();
         let mut cpu = CPU {
             registers: [0; 16],
             memory: [0; 0x1000],
-            pc: 0,
+            pc: 0x200,
             stack: [0;16],
             stack_pointer: 0,
             index_register: 0,
@@ -51,6 +62,7 @@ impl CPU {
             keys: [false; 16],
             dt: 0,
             st: 0,
+            window,
         };
         cpu.load_fontset();
         cpu
@@ -74,7 +86,7 @@ impl CPU {
     }
 
     pub fn run(&mut self) {
-        loop {
+        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             let opcode = self.read_opcode();
             self.pc += 2;
 
@@ -130,6 +142,14 @@ impl CPU {
                 0xF065..=0xFF65 => { self.read_registers(x); },
                 _ => { todo!("Opcode: {:04x}", opcode); },
             }
+            let buffer = IOHandler::draw(&self.gfx);
+            self.window.update_with_buffer(&buffer, SCREEN_WIDTH.into(), SCREEN_HEIGHT.into()).unwrap();
+        }
+    }
+
+    pub fn load_program(&mut self, program: Vec<u8>) {
+        for (i, byte) in program.iter().enumerate() {
+            self.memory[self.pc + i] = *byte;
         }
     }
 
