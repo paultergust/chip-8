@@ -5,12 +5,11 @@
 [CHIP-8](https://en.wikipedia.org/wiki/CHIP-8) is an interpreted programming language developed in the mid-1970s to simplify game development on the COSMAC VIP and other early microcomputers.
 
 ## Architecture
-* Memory: 4KB (4096 bytes), with the first 512 bytes (0x000 to 0x1FF) reserved for the interpreter.
-* Registers: 16 general-purpose 8-bit registers (V0 to VF) and a 16-bit register (I) for memory addresses.
-* Stack: Used to store return addresses when subroutines are called, typically up to 16 levels deep.
+* Memory: 4KB (4096 bytes)
+* Registers: 16 general-purpose 8-bit registers (V0 to VF) and a 12-bit register (I) for memory addresses.
 * Timers: Two 8-bit timers, a delay timer, and a sound timer, which decrement at 60Hz.
 * Display: 64x32 monochrome pixel display, updated through draw instructions.
-* Input: 16-key hexadecimal keypad (0-9, A-F).
+* Input: 16-key keypad
 * Instruction Set: CHIP-8 has 35 opcodes, each 2 bytes long. These instructions cover basic operations such as arithmetic, control flow, drawing graphics, and interacting with the keypad.
 
 ## Emulator Features
