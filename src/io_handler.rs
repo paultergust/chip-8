@@ -26,7 +26,6 @@ fn draw_sprite(buffer: &mut Vec<u32>, x: usize, y: usize, sprite: &[u8]) {
             }
         }
     }
-}
 
 fn draw_sprite(buffer: &mut Vec<u32>, x: usize, y: usize, sprite: &[u8]) {
     for (row, &byte) in sprite.iter().enumerate() {
