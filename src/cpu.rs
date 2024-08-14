@@ -7,7 +7,6 @@ const SCREEN_HEIGHT: u8 = 32;
 const SCREEN_WIDTH: u8 = 64;
 const BUFFER_SIZE: usize = SCREEN_HEIGHT as usize * SCREEN_WIDTH as usize;
 const SCALE: usize = 10;
-const FPS: usize = 120;
 
 const FONTSET: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
@@ -292,8 +291,8 @@ impl CPU {
         let x = self.get_register(vx);
         let previous_msb = x & 0b10000000;
 
-        self.registers[vx as usize] = x << 1;
-        self.registers[0xf] = previous_msb;
+        self.registers[vx as usize] = (x as u8) << 1;
+        self.registers[0xf] = previous_msb as u8 >> 7;
     }
 
     // (Annn) set index register to addr nnn
@@ -348,7 +347,7 @@ impl CPU {
                 }
 
                 // XOR operation to draw the pixel (flip the pixel)
-                self.gfx[idx as usize] ^= pixel;
+                self.gfx[idx as usize] ^= pixel as u8;
             }
         }
         let buffer = IOHandler::draw(&self.gfx);
@@ -379,24 +378,24 @@ impl CPU {
     // Fx0A wait for keypress
     fn await_keypress(&mut self, vx: u8) {
         // check each key
-        for i in 0..self.keys.len() {
-            if self.keys[i] {
-                self.registers[vx as usize] = i as u8;
-                return;
+        loop {
+            for i in 0..self.keys.len() {
+                if self.keys[i] {
+                    self.registers[vx as usize] = i as u8;
+                    break;
+                }
             }
         }
-        // if none is pressed, jmp to previous instruction (recursion)
-        self.pc -= 2;
     }
 
     // Fx15 loads the value of Vx into dt
     fn set_dt(&mut self, vx: u8) {
-        self.delay_timer = self.get_register(vx);
+        self.delay_timer = self.get_register(vx) as u8;
     }
 
     // Fx18 loads the value of Vx into st
     fn set_st(&mut self, vx: u8) {
-        self.sound_timer = self.get_register(vx);
+        self.sound_timer = self.get_register(vx) as u8;
     }
 
     // Fx1E add I to Vx and store in I
@@ -404,7 +403,7 @@ impl CPU {
         self.memory_pointer += self.get_register(vx) as u16;
     }
 
-    // Fx29 set I to adress of digit sprit at Vx
+    // Fx29 set I to adress of digit sprite at Vx
     fn index_digit(&mut self, vx: u8) {
         self.memory_pointer = (self.memory[vx as usize] as u16) * 5 + 0x50;
     }
