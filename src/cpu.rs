@@ -36,10 +36,10 @@ pub struct CPU {
     memory: [u8; 0x1000],
     stack: [u16; 16],
     stack_pointer: usize,
-    index_register: u16,
+    memory_pointer: u16,
     gfx: [u8; BUFFER_SIZE],
-    dt: u8, // delaytime
-    st: u8, // sound timer
+    delay_timer: u8, // delaytime
+    sound_timer: u8, // sound timer
 }
 
 impl CPU {
@@ -56,11 +56,11 @@ impl CPU {
             pc: 0x200,
             stack: [0;16],
             stack_pointer: 0,
-            index_register: 0,
+            memory_pointer: 0,
             gfx: [0; BUFFER_SIZE],
             keys: [false; 16],
-            dt: 0,
-            st: 0,
+            delay_timer: 0,
+            sound_timer: 0,
             window,
         };
         cpu.load_fontset();
@@ -89,6 +89,7 @@ impl CPU {
     pub fn run(&mut self) {
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             let opcode = self.read_opcode();
+            println!("{:4X}", opcode);
             self.pc += 2;
 
             // let c = ((opcode & 0xF000) >> 12) as u8;
@@ -108,7 +109,7 @@ impl CPU {
                 0x2000..=0x2FFF => { self.call(addr); },
                 0x3000..=0x3FFF => { self.se(x, kk); },
                 0x4000..=0x4FFF => { self.sne(x, kk); },
-                0x5000..=0x5FFF => { self.se(x, y); },
+                0x5000..=0x5FF0 => { self.sev(x, y); },
                 0x6000..=0x6FFF => { self.ld(x, kk); },
                 0x7000..=0x7FFF => { self.add(x, kk); },
                 0x8000..=0x8FFF => {
@@ -153,6 +154,11 @@ impl CPU {
         }
     }
 
+    // 00E0 CLS clear screen
+    fn clear_screen(&mut self) {
+        self.gfx.iter_mut().for_each(|pixel| *pixel = 0);
+    }
+
     // (1nnn) jump to addr nnn
     fn jmp(&mut self, addr: u16) {
         self.pc = addr as usize;
@@ -169,12 +175,13 @@ impl CPU {
 
         stack[sp] = self.pc as u16;
         self.stack_pointer += 1;
-        self.pc = addr as usize;
+        stack[sp + 1] = addr;
+        self.jmp(addr);
     }
 
-    // (3xkk) | (5xy) skip instruction if vx equals vy or kk
+    // (3xkk) | skip instruction if vx equals kk
     fn se(&mut self, vx: u8, kk: u8) {
-        if vx == kk {
+        if self.get_register(vx) == kk {
             self.pc += 2;
         }
     }
@@ -182,6 +189,13 @@ impl CPU {
     // (4xkk) skip if vx NOT equal to kk
     fn sne(&mut self, vx: u8, kk: u8) {
         if vx != kk {
+            self.pc += 2;
+        }
+    }
+
+    // (5xy) skip instruction if vx equals vy
+    fn sev(&mut self, vx: u8, kk: u8) {
+        if self.get_register(vx) == self.get_register(kk) {
             self.pc += 2;
         }
     }
@@ -284,7 +298,7 @@ impl CPU {
 
     // (Annn) set index register to addr nnn
     fn set_index(&mut self, addr: u16) {
-        self.index_register = addr;
+        self.memory_pointer = addr;
     }
 
     // (Bnnn) jmp pc to v0 + addr
@@ -317,7 +331,7 @@ impl CPU {
             let y_coord = (vy + byte as usize) % h;
 
             // Retrieve the current line of the sprite
-            let sprite_line = self.memory[(self.index_register + byte as u16) as usize];
+            let sprite_line = self.memory[(self.memory_pointer + byte as u16) as usize];
 
             for bit in 0..8 {
                 // Calculate the x coordinate for the current pixel
@@ -359,7 +373,7 @@ impl CPU {
 
     // Fx07 loads the dt value into Vx
     fn load_td(&mut self, vx: u8) {
-        self.registers[vx as usize] = self.dt;
+        self.registers[vx as usize] = self.delay_timer;
     }
 
     // Fx0A wait for keypress
@@ -377,35 +391,35 @@ impl CPU {
 
     // Fx15 loads the value of Vx into dt
     fn set_dt(&mut self, vx: u8) {
-        self.dt = self.get_register(vx);
+        self.delay_timer = self.get_register(vx);
     }
 
     // Fx18 loads the value of Vx into st
     fn set_st(&mut self, vx: u8) {
-        self.st = self.get_register(vx);
+        self.sound_timer = self.get_register(vx);
     }
 
     // Fx1E add I to Vx and store in I
     fn add_vx_to_index(&mut self, vx: u8) {
-        self.index_register += self.get_register(vx) as u16;
+        self.memory_pointer += self.get_register(vx) as u16;
     }
 
     // Fx29 set I to adress of digit sprit at Vx
     fn index_digit(&mut self, vx: u8) {
-        self.index_register = (self.memory[vx as usize] as u16) * 5 + 0x50;
+        self.memory_pointer = (self.memory[vx as usize] as u16) * 5 + 0x50;
     }
 
     // Fx33 Store BCD representation of Vx in memory locations I, I+1, and I+2.
     fn bcd_to_i(&mut self, vx: u8) {
         let value = self.get_register(vx);
-        self.memory[self.index_register as usize] = value / 100;
-        self.memory[self.index_register as usize + 1] = (value / 10) % 10;
-        self.memory[self.index_register as usize + 2] = value % 10;
+        self.memory[self.memory_pointer as usize] = value / 100;
+        self.memory[self.memory_pointer as usize + 1] = (value / 10) % 10;
+        self.memory[self.memory_pointer as usize + 2] = value % 10;
     }
 
     // Fx55 read V0 to Vx and store into I..I+x
     fn load_registers(&mut self, vx:u8) {
-        let index_start:usize = self.index_register.into();
+        let index_start:usize = self.memory_pointer.into();
         for i in 0..vx {
             self.memory[index_start + i as usize] = self.get_register(i);
         }
@@ -413,7 +427,7 @@ impl CPU {
 
     // Fx65 Store into V0 to Vx values from I..I+x
     fn read_registers(&mut self, vx:u8) {
-        let index_start:usize = self.index_register.into();
+        let index_start:usize = self.memory_pointer.into();
         for i in 0..vx {
             self.registers[i as usize] = self.memory[index_start + i as usize];
         }
@@ -430,13 +444,6 @@ impl CPU {
         self.pc = call_addr as usize;
     }
 
-    fn clear_screen(&mut self) {
-        self.gfx.iter_mut().for_each(|pixel| *pixel = 0);
-    }
-
-    pub fn memory(self) -> [u8; 0x1000] {
-        self.memory
-    }
 
     pub fn set_key(&mut self, key: usize, pressed: bool) {
         self.keys[key] = pressed;
